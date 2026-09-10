@@ -5,17 +5,14 @@
 
 int main()
 {
-
   try
   {
-
     Server server(6379);
 
     server.start();
   }
   catch (const std::exception &exception)
   {
-
     std::cerr
         << "Fatal error: "
         << exception.what()
