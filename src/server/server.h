@@ -8,16 +8,13 @@ class Server
 private:
   int serverSocket;
   int port;
-
   Database database;
   CommandHandler commandHandler;
 
-  void handleClient(
-      int clientSocket);
+  void handleClient(int clientSocket);
 
 public:
   explicit Server(int port);
-
   ~Server();
 
   void start();

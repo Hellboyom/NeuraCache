@@ -1,6 +1,7 @@
 #include "database.h"
 
 Database::Database()
+    : lru(3)
 {
 }
 
@@ -25,13 +26,27 @@ void Database::removeExpired(
         isExpired(iterator->second))
     {
         data.erase(iterator);
+
+        lru.remove(key);
     }
+}
+
+void Database::removeEvictedKeys(
+    const std::optional<std::string> &evictedKey)
+{
+    if (!evictedKey.has_value())
+    {
+        return;
+    }
+
+    data.erase(evictedKey.value());
 }
 
 void Database::set(
     const std::string &key,
     const std::string &value)
 {
+
     std::lock_guard<std::mutex> lock(mutex);
 
     Entry entry;
@@ -39,7 +54,21 @@ void Database::set(
     entry.value = value;
     entry.expiresAt.reset();
 
+    bool keyAlreadyExists =
+        data.find(key) != data.end();
+
     data[key] = std::move(entry);
+
+    if (keyAlreadyExists)
+    {
+        lru.touch(key);
+        return;
+    }
+
+    std::optional<std::string> evictedKey =
+        lru.insert(key);
+
+    removeEvictedKeys(evictedKey);
 }
 
 void Database::set(
@@ -47,6 +76,7 @@ void Database::set(
     const std::string &value,
     long long ttlSeconds)
 {
+
     std::lock_guard<std::mutex> lock(mutex);
 
     Entry entry;
@@ -57,7 +87,21 @@ void Database::set(
         std::chrono::steady_clock::now() +
         std::chrono::seconds(ttlSeconds);
 
+    bool keyAlreadyExists =
+        data.find(key) != data.end();
+
     data[key] = std::move(entry);
+
+    if (keyAlreadyExists)
+    {
+        lru.touch(key);
+        return;
+    }
+
+    std::optional<std::string> evictedKey =
+        lru.insert(key);
+
+    removeEvictedKeys(evictedKey);
 }
 
 bool Database::get(
@@ -77,6 +121,8 @@ bool Database::get(
 
     value = iterator->second.value;
 
+    lru.touch(key);
+
     return true;
 }
 
@@ -87,7 +133,18 @@ bool Database::del(
 
     removeExpired(key);
 
-    return data.erase(key) > 0;
+    auto iterator = data.find(key);
+
+    if (iterator == data.end())
+    {
+        return false;
+    }
+
+    data.erase(iterator);
+
+    lru.remove(key);
+
+    return true;
 }
 
 bool Database::exists(
@@ -97,7 +154,16 @@ bool Database::exists(
 
     removeExpired(key);
 
-    return data.find(key) != data.end();
+    auto iterator = data.find(key);
+
+    if (iterator == data.end())
+    {
+        return false;
+    }
+
+    lru.touch(key);
+
+    return true;
 }
 
 bool Database::expire(
@@ -124,6 +190,8 @@ bool Database::expire(
         std::chrono::steady_clock::now() +
         std::chrono::seconds(ttlSeconds);
 
+    lru.touch(key);
+
     return true;
 }
 
@@ -143,6 +211,8 @@ long long Database::ttl(
 
     if (!iterator->second.expiresAt.has_value())
     {
+        lru.touch(key);
+
         return -1;
     }
 
@@ -156,8 +226,12 @@ long long Database::ttl(
     {
         data.erase(iterator);
 
+        lru.remove(key);
+
         return -2;
     }
+
+    lru.touch(key);
 
     return remaining.count();
 }
@@ -174,4 +248,27 @@ void Database::clear()
     std::lock_guard<std::mutex> lock(mutex);
 
     data.clear();
+
+    lru.clear();
+}
+
+void Database::setCapacity(
+    std::size_t newCapacity)
+{
+    std::lock_guard<std::mutex> lock(mutex);
+
+    std::vector<std::string> evictedKeys =
+        lru.setCapacity(newCapacity);
+
+    for (const std::string &key : evictedKeys)
+    {
+        data.erase(key);
+    }
+}
+
+std::size_t Database::capacity() const
+{
+    std::lock_guard<std::mutex> lock(mutex);
+
+    return lru.getCapacity();
 }

@@ -1,5 +1,5 @@
 #include "command_handler.h"
-
+#include <iostream>
 #include <algorithm>
 #include <cctype>
 
@@ -60,6 +60,16 @@ std::string CommandHandler::execute(
 
   const std::string operation =
       upper(command[0]);
+  std::cerr << "DEBUG argc=" << command.size()
+            << " length=" << operation.size()
+            << " operation=[" << operation << "] bytes=";
+
+  for (unsigned char character : operation)
+  {
+    std::cerr << static_cast<int>(character) << " ";
+  }
+
+  std::cerr << std::endl;
 
   if (operation == "PING")
   {

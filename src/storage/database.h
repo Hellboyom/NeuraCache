@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../eviction/lru_cache.h"
+
 #include <chrono>
 #include <cstddef>
 #include <mutex>
@@ -10,60 +12,68 @@
 class Database
 {
 public:
+  Database();
 
-    Database();
+  void set(
+      const std::string &key,
+      const std::string &value);
 
-    void set(
-        const std::string &key,
-        const std::string &value);
+  void set(
+      const std::string &key,
+      const std::string &value,
+      long long ttlSeconds);
 
-    void set(
-        const std::string &key,
-        const std::string &value,
-        long long ttlSeconds);
+  bool get(
+      const std::string &key,
+      std::string &value);
 
-    bool get(
-        const std::string &key,
-        std::string &value);
+  bool del(
+      const std::string &key);
 
-    bool del(
-        const std::string &key);
+  bool exists(
+      const std::string &key);
 
-    bool exists(
-        const std::string &key);
+  bool expire(
+      const std::string &key,
+      long long ttlSeconds);
 
-    bool expire(
-        const std::string &key,
-        long long ttlSeconds);
+  long long ttl(
+      const std::string &key);
 
-    long long ttl(
-        const std::string &key);
+  std::size_t size() const;
 
-    std::size_t size() const;
+  void clear();
 
-    void clear();
+  void setCapacity(
+      std::size_t capacity);
+
+  std::size_t capacity() const;
 
 private:
+  struct Entry
+  {
+    std::string value;
 
-    struct Entry
-    {
-        std::string value;
+    std::optional<
+        std::chrono::steady_clock::time_point>
+        expiresAt;
+  };
 
-        std::optional<
-            std::chrono::steady_clock::time_point>
-            expiresAt;
-    };
+  bool isExpired(
+      const Entry &entry) const;
 
-    bool isExpired(
-        const Entry &entry) const;
+  void removeExpired(
+      const std::string &key);
 
-    void removeExpired(
-        const std::string &key);
+  void removeEvictedKeys(
+      const std::optional<std::string> &evictedKey);
 
-    std::unordered_map<
-        std::string,
-        Entry>
-        data;
+  std::unordered_map<
+      std::string,
+      Entry>
+      data;
 
-    mutable std::mutex mutex;
+  LRUCache lru;
+
+  mutable std::mutex mutex;
 };
