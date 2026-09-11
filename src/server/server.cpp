@@ -6,7 +6,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
-
+#include <thread>
 #include <cerrno>
 #include <cstring>
 #include <iostream>
@@ -93,15 +93,13 @@ void Server::start()
     while (true)
     {
         sockaddr_in clientAddress{};
+        socklen_t clientLength = sizeof(clientAddress);
 
-        socklen_t clientLength =
-            sizeof(clientAddress);
-
-        int clientSocket = accept(
-            serverSocket,
-            reinterpret_cast<sockaddr *>(
-                &clientAddress),
-            &clientLength);
+        int clientSocket =
+            accept(
+                serverSocket,
+                reinterpret_cast<sockaddr *>(&clientAddress),
+                &clientLength);
 
         if (clientSocket < 0)
         {
@@ -116,13 +114,12 @@ void Server::start()
             << "Client connected"
             << std::endl;
 
-        handleClient(clientSocket);
+        std::thread clientThread(
+            &Server::handleClient,
+            this,
+            clientSocket);
 
-        close(clientSocket);
-
-        std::cout
-            << "Client disconnected"
-            << std::endl;
+        clientThread.detach();
     }
 }
 

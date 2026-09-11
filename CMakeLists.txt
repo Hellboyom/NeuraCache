@@ -61,3 +61,8 @@ add_executable(
 
     tests/test_server.cpp
 )
+add_executable(
+    test_concurrency
+
+    tests/test_concurrency.cpp
+)
