@@ -26,6 +26,8 @@ add_executable(
     src/storage/database.cpp
     src/commands/command_handler.cpp
     src/eviction/lru_cache.cpp
+    src/persistence/snapshot.cpp
+    src/metrics/metrics.cpp
 )
 
 add_executable(
@@ -41,6 +43,8 @@ add_executable(
     tests/test_database.cpp
     src/storage/database.cpp
     src/eviction/lru_cache.cpp
+    src/persistence/snapshot.cpp
+    src/metrics/metrics.cpp
 )
 add_executable(
     test_commands
@@ -49,6 +53,8 @@ add_executable(
     src/commands/command_handler.cpp
     src/storage/database.cpp
     src/eviction/lru_cache.cpp
+    src/persistence/snapshot.cpp
+    src/metrics/metrics.cpp
 )
 add_executable(
     test_resp
@@ -65,4 +71,16 @@ add_executable(
     test_concurrency
 
     tests/test_concurrency.cpp
+)
+add_executable(
+    test_snapshot
+
+    tests/test_snapshot.cpp
+    src/persistence/snapshot.cpp
+)
+add_executable(
+    test_metrics
+
+    tests/test_metrics.cpp
+    src/metrics/metrics.cpp
 )

@@ -1,5 +1,6 @@
 #include "../src/commands/command_handler.h"
 #include "../src/storage/database.h"
+#include "../src/metrics/metrics.h"
 
 #include <cassert>
 #include <iostream>
@@ -9,7 +10,10 @@
 void testPing()
 {
   Database database;
-  CommandHandler handler(database);
+  Metrics metrics;
+  CommandHandler handler(
+      database,
+      metrics);
 
   std::string response =
       handler.execute({"PING"});
@@ -22,7 +26,10 @@ void testPing()
 void testSet()
 {
   Database database;
-  CommandHandler handler(database);
+  Metrics metrics;
+  CommandHandler handler(
+      database,
+      metrics);
 
   std::string response =
       handler.execute({"SET",
@@ -42,7 +49,10 @@ void testSet()
 void testGet()
 {
   Database database;
-  CommandHandler handler(database);
+  Metrics metrics;
+  CommandHandler handler(
+      database,
+      metrics);
 
   database.set("A", "Hello");
 
@@ -58,7 +68,10 @@ void testGet()
 void testGetMissing()
 {
   Database database;
-  CommandHandler handler(database);
+  Metrics metrics;
+  CommandHandler handler(
+      database,
+      metrics);
 
   std::string response =
       handler.execute({"GET",
@@ -72,7 +85,10 @@ void testGetMissing()
 void testDelete()
 {
   Database database;
-  CommandHandler handler(database);
+  Metrics metrics;
+  CommandHandler handler(
+      database,
+      metrics);
 
   database.set("A", "Hello");
 
@@ -95,7 +111,10 @@ void testDelete()
 void testExists()
 {
   Database database;
-  CommandHandler handler(database);
+  Metrics metrics;
+  CommandHandler handler(
+      database,
+      metrics);
 
   database.set("A", "Hello");
 
@@ -117,7 +136,10 @@ void testExists()
 void testSetWithTTL()
 {
   Database database;
-  CommandHandler handler(database);
+  Metrics metrics;
+  CommandHandler handler(
+      database,
+      metrics);
 
   std::string response =
       handler.execute({"SET",
@@ -140,7 +162,10 @@ void testSetWithTTL()
 void testExpire()
 {
   Database database;
-  CommandHandler handler(database);
+  Metrics metrics;
+  CommandHandler handler(
+      database,
+      metrics);
 
   database.set("A", "Hello");
 
@@ -163,7 +188,10 @@ void testExpire()
 void testTTL()
 {
   Database database;
-  CommandHandler handler(database);
+  Metrics metrics;
+  CommandHandler handler(
+      database,
+      metrics);
 
   database.set("A", "Hello");
 
@@ -195,7 +223,10 @@ void testTTL()
 void testFlushDB()
 {
   Database database;
-  CommandHandler handler(database);
+  Metrics metrics;
+  CommandHandler handler(
+      database,
+      metrics);
 
   database.set("A", "1");
   database.set("B", "2");
@@ -214,7 +245,10 @@ void testFlushDB()
 void testUnknownCommand()
 {
   Database database;
-  CommandHandler handler(database);
+  Metrics metrics;
+  CommandHandler handler(
+      database,
+      metrics);
 
   std::string response =
       handler.execute({"NOPE"});
@@ -227,7 +261,10 @@ void testUnknownCommand()
 void testWrongArguments()
 {
   Database database;
-  CommandHandler handler(database);
+  Metrics metrics;
+  CommandHandler handler(
+      database,
+      metrics);
 
   std::string response =
       handler.execute({"GET"});
@@ -250,7 +287,10 @@ void testWrongArguments()
 void testCaseInsensitiveCommands()
 {
   Database database;
-  CommandHandler handler(database);
+  Metrics metrics;
+  CommandHandler handler(
+      database,
+      metrics);
 
   std::string response =
       handler.execute({"ping"});

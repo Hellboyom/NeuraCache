@@ -15,14 +15,6 @@ namespace
 
   int connectToServer()
   {
-    int socketFd =
-        socket(
-            AF_INET,
-            SOCK_STREAM,
-            0);
-
-    assert(socketFd >= 0);
-
     sockaddr_in serverAddress{};
 
     serverAddress.sin_family =
@@ -39,8 +31,18 @@ namespace
 
     assert(result == 1);
 
-    for (int attempt = 0; attempt < 20; ++attempt)
+    for (int attempt = 0;
+         attempt < 20;
+         ++attempt)
     {
+      int socketFd =
+          socket(
+              AF_INET,
+              SOCK_STREAM,
+              0);
+
+      assert(socketFd >= 0);
+
       result =
           connect(
               socketFd,
@@ -53,15 +55,14 @@ namespace
         return socketFd;
       }
 
+      close(socketFd);
+
       std::this_thread::sleep_for(
           std::chrono::milliseconds(100));
     }
 
-    close(socketFd);
-
     return -1;
   }
-
   std::string sendCommand(
       int socketFd,
       const std::string &command)
@@ -372,23 +373,78 @@ void testUnknownCommand(int socketFd)
 
 int main()
 {
-  int socketFd =
-      connectToServer();
+  {
+    int socketFd = connectToServer();
 
-  assert(
-      socketFd >= 0);
+    assert(socketFd >= 0);
 
-  testPing(socketFd);
-  testSetAndGet(socketFd);
-  testExistsAndDelete(socketFd);
-  testSetWithTTL(socketFd);
-  testExpire(socketFd);
-  testPipelining(socketFd);
-  testUnknownCommand(socketFd);
+    testPing(socketFd);
 
-  close(socketFd);
+    close(socketFd);
+  }
+
+  {
+    int socketFd = connectToServer();
+
+    assert(socketFd >= 0);
+
+    testSetAndGet(socketFd);
+
+    close(socketFd);
+  }
+
+  {
+    int socketFd = connectToServer();
+
+    assert(socketFd >= 0);
+
+    testExistsAndDelete(socketFd);
+
+    close(socketFd);
+  }
+
+  {
+    int socketFd = connectToServer();
+
+    assert(socketFd >= 0);
+
+    testSetWithTTL(socketFd);
+
+    close(socketFd);
+  }
+
+  {
+    int socketFd = connectToServer();
+
+    assert(socketFd >= 0);
+
+    testExpire(socketFd);
+
+    close(socketFd);
+  }
+
+  {
+    int socketFd = connectToServer();
+
+    assert(socketFd >= 0);
+
+    testPipelining(socketFd);
+
+    close(socketFd);
+  }
+
+  {
+    int socketFd = connectToServer();
+
+    assert(socketFd >= 0);
+
+    testUnknownCommand(socketFd);
+
+    close(socketFd);
+  }
 
   std::cout << std::endl;
+
   std::cout
       << "All Server integration tests passed!"
       << std::endl;

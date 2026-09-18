@@ -1,6 +1,7 @@
 #include "../src/storage/database.h"
 
 #include <cassert>
+#include <cstdio>
 #include <chrono>
 #include <iostream>
 #include <string>
@@ -243,6 +244,71 @@ void testCapacity()
 
   std::cout << "PASS: capacity" << std::endl;
 }
+void testSnapshotPersistence()
+{
+  const std::string filename =
+      "test_database_snapshot.dat";
+
+  {
+    Database database;
+
+    database.set(
+        "A",
+        "Hello");
+
+    database.set(
+        "B",
+        "World",
+        10);
+
+    bool saved =
+        database.saveSnapshot(
+            filename);
+
+    assert(saved);
+  }
+
+  {
+    Database database;
+
+    bool loaded =
+        database.loadSnapshot(
+            filename);
+
+    assert(loaded);
+
+    std::string value;
+
+    bool found =
+        database.get(
+            "A",
+            value);
+
+    assert(found);
+    assert(value == "Hello");
+
+    found =
+        database.get(
+            "B",
+            value);
+
+    assert(found);
+    assert(value == "World");
+
+    long long ttl =
+        database.ttl("B");
+
+    assert(ttl >= 0);
+    assert(ttl <= 10);
+  }
+
+  std::remove(
+      filename.c_str());
+
+  std::cout
+      << "PASS: snapshot persistence"
+      << std::endl;
+}
 
 int main()
 {
@@ -257,6 +323,7 @@ int main()
   testLRUEviction();
   testFlushDB();
   testCapacity();
+  testSnapshotPersistence();
 
   std::cout << std::endl;
   std::cout << "All Database tests passed!" << std::endl;

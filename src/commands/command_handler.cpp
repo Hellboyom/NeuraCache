@@ -1,52 +1,52 @@
 #include "command_handler.h"
-#include <iostream>
+
 #include <algorithm>
 #include <cctype>
+#include <sstream>
 
-namespace
+std::string CommandHandler::upper(
+    const std::string &value) const
 {
+  std::string result = value;
 
-  std::string upper(
-      std::string value)
+  std::transform(
+      result.begin(),
+      result.end(),
+      result.begin(),
+      [](unsigned char character)
+      {
+        return static_cast<char>(
+            std::toupper(character));
+      });
+
+  return result;
+}
+
+bool CommandHandler::parseLongLong(
+    const std::string &value,
+    long long &result) const
+{
+  try
   {
-    std::transform(
-        value.begin(),
-        value.end(),
-        value.begin(),
-        [](unsigned char character)
-        {
-          return static_cast<char>(
-              std::toupper(character));
-        });
+    std::size_t consumed = 0;
 
-    return value;
+    result = std::stoll(
+        value,
+        &consumed);
+
+    return consumed == value.size();
   }
-
-  bool parseLongLong(
-      const std::string &value,
-      long long &result)
+  catch (...)
   {
-    try
-    {
-      std::size_t consumed = 0;
-
-      result = std::stoll(
-          value,
-          &consumed);
-
-      return consumed == value.size();
-    }
-    catch (...)
-    {
-      return false;
-    }
+    return false;
   }
-
 }
 
 CommandHandler::CommandHandler(
-    Database &database)
-    : database(database)
+    Database &database,
+    Metrics &metrics)
+    : database(database),
+      metrics(metrics)
 {
 }
 
@@ -58,18 +58,10 @@ std::string CommandHandler::execute(
     return "-ERR empty command\r\n";
   }
 
+  metrics.recordCommand();
+
   const std::string operation =
       upper(command[0]);
-  std::cerr << "DEBUG argc=" << command.size()
-            << " length=" << operation.size()
-            << " operation=[" << operation << "] bytes=";
-
-  for (unsigned char character : operation)
-  {
-    std::cerr << static_cast<int>(character) << " ";
-  }
-
-  std::cerr << std::endl;
 
   if (operation == "PING")
   {
@@ -83,6 +75,8 @@ std::string CommandHandler::execute(
 
   if (operation == "SET")
   {
+    metrics.recordSet();
+
     if (command.size() == 3)
     {
       database.set(
@@ -118,6 +112,8 @@ std::string CommandHandler::execute(
 
   if (operation == "GET")
   {
+    metrics.recordGet();
+
     if (command.size() != 2)
     {
       return "-ERR wrong number of arguments for GET\r\n";
@@ -129,8 +125,12 @@ std::string CommandHandler::execute(
             command[1],
             value))
     {
+      metrics.recordCacheMiss();
+
       return "$-1\r\n";
     }
+
+    metrics.recordCacheHit();
 
     return "$" +
            std::to_string(value.size()) +
@@ -141,6 +141,8 @@ std::string CommandHandler::execute(
 
   if (operation == "DEL")
   {
+    metrics.recordDel();
+
     if (command.size() != 2)
     {
       return "-ERR wrong number of arguments for DEL\r\n";
@@ -222,6 +224,24 @@ std::string CommandHandler::execute(
     database.clear();
 
     return "+OK\r\n";
+  }
+
+  if (operation == "INFO")
+  {
+    if (command.size() != 1)
+    {
+      return "-ERR wrong number of arguments for INFO\r\n";
+    }
+
+    std::string information =
+        metrics.info();
+
+    return "$" +
+           std::to_string(
+               information.size()) +
+           "\r\n" +
+           information +
+           "\r\n";
   }
 
   return "-ERR unknown command\r\n";

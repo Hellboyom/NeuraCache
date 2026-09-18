@@ -2,19 +2,29 @@
 
 #include "../commands/command_handler.h"
 #include "../storage/database.h"
+#include "../metrics/metrics.h"
+
+#include <string>
 
 class Server
 {
 private:
   int serverSocket;
   int port;
+
+  Metrics metrics;
   Database database;
   CommandHandler commandHandler;
 
-  void handleClient(int clientSocket);
+  std::string snapshotFile;
+
+  void handleClient(
+      int clientSocket);
 
 public:
-  explicit Server(int port);
+  explicit Server(
+      int port);
+
   ~Server();
 
   void start();

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../eviction/lru_cache.h"
+#include "../persistence/snapshot.h"
+#include "../metrics/metrics.h"
 
 #include <chrono>
 #include <cstddef>
@@ -13,6 +15,12 @@ class Database
 {
 public:
   Database();
+
+  explicit Database(
+      Metrics &metrics);
+
+  void setMetrics(
+      Metrics *metrics);
 
   void set(
       const std::string &key,
@@ -49,6 +57,12 @@ public:
 
   std::size_t capacity() const;
 
+  bool saveSnapshot(
+      const std::string &filename);
+
+  bool loadSnapshot(
+      const std::string &filename);
+
 private:
   struct Entry
   {
@@ -74,6 +88,8 @@ private:
       data;
 
   LRUCache lru;
+
+  Metrics *metrics;
 
   mutable std::mutex mutex;
 };
