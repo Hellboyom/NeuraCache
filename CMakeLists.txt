@@ -84,3 +84,14 @@ add_executable(
     tests/test_metrics.cpp
     src/metrics/metrics.cpp
 )
+enable_testing()
+
+add_test(NAME test_lru COMMAND test_lru)
+add_test(NAME test_database COMMAND test_database)
+add_test(NAME test_commands COMMAND test_commands)
+add_test(NAME test_resp COMMAND test_resp)
+# TODO: Re-enable server integration test after fixing test harness.
+# add_test(NAME test_server COMMAND test_server)
+add_test(NAME test_concurrency COMMAND test_concurrency)
+add_test(NAME test_snapshot COMMAND test_snapshot)
+add_test(NAME test_metrics COMMAND test_metrics)
