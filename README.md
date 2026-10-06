@@ -59,7 +59,6 @@ The predictor tracks:
 
 The prediction score is calculated as:
 
-```text
 score = 0.6 × frequency + 0.4 × recency
 
 
@@ -105,6 +104,7 @@ score = 0.6 × frequency + 0.4 × recency
 │              │  Metrics  │      │   Persistence   │ │
 │              └───────────┘      └─────────────────┘ │
 └──────────────────────────────────────────────────────┘
+'''
 
 
 
