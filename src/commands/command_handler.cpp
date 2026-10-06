@@ -200,7 +200,47 @@ std::string CommandHandler::execute(
                database.ttl(command[1])) +
            "\r\n";
   }
+  if (operation == "INCR")
+  {
+    if (command.size() != 2)
+    {
+      return "-ERR wrong number of arguments for INCR\r\n";
+    }
 
+    long long value;
+
+    if (!database.incr(
+            command[1],
+            value))
+    {
+      return "-ERR value is not an integer or out of range\r\n";
+    }
+
+    return ":" +
+           std::to_string(value) +
+           "\r\n";
+  }
+
+  if (operation == "DECR")
+  {
+    if (command.size() != 2)
+    {
+      return "-ERR wrong number of arguments for DECR\r\n";
+    }
+
+    long long value;
+
+    if (!database.decr(
+            command[1],
+            value))
+    {
+      return "-ERR value is not an integer or out of range\r\n";
+    }
+
+    return ":" +
+           std::to_string(value) +
+           "\r\n";
+  }
   if (operation == "DBSIZE")
   {
     if (command.size() != 1)
@@ -241,6 +281,124 @@ std::string CommandHandler::execute(
                information.size()) +
            "\r\n" +
            information +
+           "\r\n";
+  }
+  if (operation == "PREDICT")
+  {
+    if (command.size() != 2)
+    {
+      return "-ERR wrong number of arguments for PREDICT\r\n";
+    }
+
+    Predictor::Prediction prediction =
+        database.predict(command[1]);
+
+    std::string result =
+        "key: " +
+        prediction.key +
+        "\n" +
+        "score: " +
+        std::to_string(prediction.score) +
+        "\n" +
+        "estimated_accesses: " +
+        std::to_string(prediction.estimatedAccesses);
+
+    return "$" +
+           std::to_string(result.size()) +
+           "\r\n" +
+           result +
+           "\r\n";
+  }
+  if (operation == "TOPPREDICT")
+  {
+    if (command.size() != 2)
+    {
+      return "-ERR wrong number of arguments for TOPPREDICT\r\n";
+    }
+
+    long long limit;
+
+    if (!parseLongLong(command[1], limit) ||
+        limit <= 0)
+    {
+      return "-ERR invalid limit\r\n";
+    }
+
+    std::vector<Predictor::Prediction> predictions =
+        database.topPredictions(
+            static_cast<std::size_t>(limit));
+
+    std::string result;
+
+    for (const auto &prediction : predictions)
+    {
+      result +=
+          prediction.key +
+          " score=" +
+          std::to_string(prediction.score) +
+          " accesses=" +
+          std::to_string(
+              prediction.estimatedAccesses) +
+          "\n";
+    }
+
+    return "$" +
+           std::to_string(result.size()) +
+           "\r\n" +
+           result +
+           "\r\n";
+  }
+  if (operation == "ANALYZE")
+  {
+    if (command.size() != 1)
+    {
+      return "-ERR wrong number of arguments for ANALYZE\r\n";
+    }
+
+    std::size_t totalAccesses =
+        database.totalPredictedAccesses();
+
+    std::size_t trackedKeys =
+        database.trackedPredictionKeys();
+
+    std::vector<Predictor::Prediction> predictions =
+        database.topPredictions(5);
+
+    std::string result;
+
+    result +=
+        "AI CACHE ANALYSIS\n";
+
+    result +=
+        "total_accesses: " +
+        std::to_string(totalAccesses) +
+        "\n";
+
+    result +=
+        "tracked_keys: " +
+        std::to_string(trackedKeys) +
+        "\n";
+
+    result +=
+        "top_keys:\n";
+
+    for (const auto &prediction : predictions)
+    {
+      result +=
+          "  " +
+          prediction.key +
+          " score=" +
+          std::to_string(prediction.score) +
+          " accesses=" +
+          std::to_string(
+              prediction.estimatedAccesses) +
+          "\n";
+    }
+
+    return "$" +
+           std::to_string(result.size()) +
+           "\r\n" +
+           result +
            "\r\n";
   }
 

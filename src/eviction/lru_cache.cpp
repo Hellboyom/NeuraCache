@@ -105,3 +105,20 @@ std::vector<std::string> LRUCache::setCapacity(
 
     return evictedKeys;
 }
+std::vector<std::string> LRUCache::keys() const
+{
+    std::vector<std::string> result;
+
+    for (const auto &key : order)
+    {
+        result.push_back(key);
+    }
+
+    return result;
+}
+
+bool LRUCache::contains(
+    const std::string &key) const
+{
+    return positions.find(key) != positions.end();
+}

@@ -1,6 +1,7 @@
 #include "database.h"
 #include "../persistence/snapshot.h"
 
+#include <climits>
 #include <utility>
 #include <vector>
 
@@ -157,6 +158,8 @@ bool Database::get(
 
     value = iterator->second.value;
 
+    predictor.recordAccess(key);
+
     lru.touch(key);
 
     return true;
@@ -196,6 +199,7 @@ bool Database::exists(
     {
         return false;
     }
+    predictor.recordAccess(key);
 
     lru.touch(key);
 
@@ -276,7 +280,158 @@ long long Database::ttl(
 
     return remaining.count();
 }
+bool Database::incr(
+    const std::string &key,
+    long long &value)
+{
+    std::lock_guard<std::mutex> lock(mutex);
 
+    removeExpired(key);
+
+    auto iterator = data.find(key);
+
+    if (iterator == data.end())
+    {
+        Entry entry;
+
+        entry.value = "1";
+        entry.expiresAt.reset();
+
+        data[key] = std::move(entry);
+
+        std::optional<std::string> evictedKey =
+            lru.insert(key);
+
+        removeEvictedKeys(
+            evictedKey);
+
+        value = 1;
+
+        return true;
+    }
+
+    long long currentValue;
+
+    try
+    {
+        std::size_t consumed = 0;
+
+        currentValue =
+            std::stoll(
+                iterator->second.value,
+                &consumed);
+
+        if (consumed !=
+            iterator->second.value.size())
+        {
+            return false;
+        }
+    }
+    catch (...)
+    {
+        return false;
+    }
+
+    if (currentValue == LLONG_MAX)
+    {
+        return false;
+    }
+
+    currentValue++;
+
+    iterator->second.value =
+        std::to_string(currentValue);
+
+    value = currentValue;
+
+    lru.touch(key);
+
+    return true;
+}
+bool Database::decr(
+    const std::string &key,
+    long long &value)
+{
+    std::lock_guard<std::mutex> lock(mutex);
+
+    removeExpired(key);
+
+    auto iterator = data.find(key);
+
+    if (iterator == data.end())
+    {
+        Entry entry;
+
+        entry.value = "-1";
+        entry.expiresAt.reset();
+
+        data[key] = std::move(entry);
+
+        std::optional<std::string> evictedKey =
+            lru.insert(key);
+
+        removeEvictedKeys(
+            evictedKey);
+
+        value = -1;
+
+        return true;
+    }
+
+    long long currentValue;
+
+    try
+    {
+        std::size_t consumed = 0;
+
+        currentValue =
+            std::stoll(
+                iterator->second.value,
+                &consumed);
+
+        if (consumed !=
+            iterator->second.value.size())
+        {
+            return false;
+        }
+    }
+    catch (...)
+    {
+        return false;
+    }
+
+    if (currentValue == LLONG_MIN)
+    {
+        return false;
+    }
+
+    currentValue--;
+
+    iterator->second.value =
+        std::to_string(currentValue);
+
+    value = currentValue;
+
+    lru.touch(key);
+
+    return true;
+}
+Predictor::Prediction Database::predict(
+    const std::string &key) const
+{
+    std::lock_guard<std::mutex> lock(mutex);
+
+    return predictor.predict(key);
+}
+
+std::vector<Predictor::Prediction>
+Database::topPredictions(
+    std::size_t limit) const
+{
+    std::lock_guard<std::mutex> lock(mutex);
+
+    return predictor.topPredictions(limit);
+}
 std::size_t Database::size() const
 {
     std::lock_guard<std::mutex> lock(mutex);
@@ -436,4 +591,15 @@ bool Database::loadSnapshot(
     }
 
     return true;
+}
+std::size_t Database::totalPredictedAccesses() const
+{
+    std::lock_guard<std::mutex> lock(mutex);
+
+    return predictor.totalAccesses();
+}
+std::size_t Database::trackedPredictionKeys() const
+{
+    std::lock_guard<std::mutex> lock(mutex);
+    return predictor.trackedKeys();
 }

@@ -3,8 +3,10 @@
 #include "../eviction/lru_cache.h"
 #include "../persistence/snapshot.h"
 #include "../metrics/metrics.h"
+#include "../ai/predictor.h"
 
 #include <chrono>
+#include <vector>
 #include <cstddef>
 #include <mutex>
 #include <optional>
@@ -14,82 +16,102 @@
 class Database
 {
 public:
-  Database();
+    Database();
 
-  explicit Database(
-      Metrics &metrics);
+    explicit Database(
+        Metrics &metrics);
 
-  void setMetrics(
-      Metrics *metrics);
+    void setMetrics(
+        Metrics *metrics);
 
-  void set(
-      const std::string &key,
-      const std::string &value);
+    void set(
+        const std::string &key,
+        const std::string &value);
 
-  void set(
-      const std::string &key,
-      const std::string &value,
-      long long ttlSeconds);
+    void set(
+        const std::string &key,
+        const std::string &value,
+        long long ttlSeconds);
 
-  bool get(
-      const std::string &key,
-      std::string &value);
+    bool get(
+        const std::string &key,
+        std::string &value);
 
-  bool del(
-      const std::string &key);
+    bool del(
+        const std::string &key);
 
-  bool exists(
-      const std::string &key);
+    bool exists(
+        const std::string &key);
 
-  bool expire(
-      const std::string &key,
-      long long ttlSeconds);
+    bool expire(
+        const std::string &key,
+        long long ttlSeconds);
 
-  long long ttl(
-      const std::string &key);
+    long long ttl(
+        const std::string &key);
 
-  std::size_t size() const;
+    bool incr(
+        const std::string &key,
+        long long &value);
 
-  void clear();
+    bool decr(
+        const std::string &key,
+        long long &value);
 
-  void setCapacity(
-      std::size_t capacity);
+    std::size_t size() const;
 
-  std::size_t capacity() const;
+    void clear();
 
-  bool saveSnapshot(
-      const std::string &filename);
+    void setCapacity(
+        std::size_t capacity);
 
-  bool loadSnapshot(
-      const std::string &filename);
+    std::size_t capacity() const;
+
+    bool saveSnapshot(
+        const std::string &filename);
+
+    bool loadSnapshot(
+        const std::string &filename);
+
+    std::size_t totalPredictedAccesses() const;
+    std::size_t trackedPredictionKeys() const;
+
+    Predictor::Prediction predict(
+        const std::string &key) const;
+
+    std::vector<Predictor::Prediction>
+    topPredictions(
+        std::size_t limit) const;
 
 private:
-  struct Entry
-  {
-    std::string value;
+    struct Entry
+    {
+        std::string value;
 
-    std::optional<
-        std::chrono::steady_clock::time_point>
-        expiresAt;
-  };
+        std::optional<
+            std::chrono::steady_clock::time_point>
+            expiresAt;
+    };
 
-  bool isExpired(
-      const Entry &entry) const;
+    bool isExpired(
+        const Entry &entry) const;
 
-  void removeExpired(
-      const std::string &key);
+    void removeExpired(
+        const std::string &key);
 
-  void removeEvictedKeys(
-      const std::optional<std::string> &evictedKey);
+    void removeEvictedKeys(
+        const std::optional<std::string> &evictedKey);
 
-  std::unordered_map<
-      std::string,
-      Entry>
-      data;
+    std::unordered_map<
+        std::string,
+        Entry>
+        data;
 
-  LRUCache lru;
+    LRUCache lru;
 
-  Metrics *metrics;
+    Predictor predictor;
 
-  mutable std::mutex mutex;
+    Metrics *metrics;
+
+    mutable std::mutex mutex;
 };

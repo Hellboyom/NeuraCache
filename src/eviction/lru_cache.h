@@ -30,6 +30,10 @@ public:
 
     std::vector<std::string> setCapacity(
         std::size_t capacity);
+    std::vector<std::string> keys() const;
+
+    bool contains(
+        const std::string &key) const;
 
 private:
     std::size_t capacity;

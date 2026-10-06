@@ -28,6 +28,7 @@ add_executable(
     src/eviction/lru_cache.cpp
     src/persistence/snapshot.cpp
     src/metrics/metrics.cpp
+    src/ai/predictor.cpp
 )
 
 add_executable(
@@ -45,6 +46,7 @@ add_executable(
     src/eviction/lru_cache.cpp
     src/persistence/snapshot.cpp
     src/metrics/metrics.cpp
+    src/ai/predictor.cpp
 )
 add_executable(
     test_commands
@@ -55,6 +57,7 @@ add_executable(
     src/eviction/lru_cache.cpp
     src/persistence/snapshot.cpp
     src/metrics/metrics.cpp
+    src/ai/predictor.cpp
 )
 add_executable(
     test_resp
@@ -84,8 +87,62 @@ add_executable(
     tests/test_metrics.cpp
     src/metrics/metrics.cpp
 )
-enable_testing()
+add_executable(
+    benchmark
 
+    benchmarks/benchmark.cpp
+    src/storage/database.cpp
+    src/eviction/lru_cache.cpp
+    src/persistence/snapshot.cpp
+    src/metrics/metrics.cpp
+    src/ai/predictor.cpp
+)
+add_executable(
+    concurrent_benchmark
+    
+    benchmarks/concurrent_benchmark.cpp
+    src/storage/database.cpp
+    src/eviction/lru_cache.cpp
+    src/persistence/snapshot.cpp
+    src/metrics/metrics.cpp
+    src/ai/predictor.cpp
+)
+add_executable(
+    test_adaptive_cache
+
+    tests/test_adaptive_cache.cpp
+    src/eviction/adaptive_cache.cpp
+    src/eviction/lru_cache.cpp
+    src/ai/predictor.cpp
+)
+add_executable(
+    test_adaptive_integration
+
+    tests/test_adaptive_integration.cpp
+    src/storage/database.cpp
+    src/eviction/adaptive_cache.cpp
+    src/eviction/lru_cache.cpp
+    src/persistence/snapshot.cpp
+    src/metrics/metrics.cpp
+    src/ai/predictor.cpp
+)
+add_executable(
+    adaptive_benchmark
+
+    benchmarks/adaptive_benchmark.cpp
+    src/eviction/adaptive_cache.cpp
+    src/eviction/lru_cache.cpp
+    src/ai/predictor.cpp
+)
+enable_testing()
+add_test(
+    NAME test_adaptive_cache
+    COMMAND test_adaptive_cache
+)
+add_test(
+    NAME test_adaptive_integration
+    COMMAND test_adaptive_integration
+)
 add_test(NAME test_lru COMMAND test_lru)
 add_test(NAME test_database COMMAND test_database)
 add_test(NAME test_commands COMMAND test_commands)
@@ -95,3 +152,4 @@ add_test(NAME test_resp COMMAND test_resp)
 add_test(NAME test_concurrency COMMAND test_concurrency)
 add_test(NAME test_snapshot COMMAND test_snapshot)
 add_test(NAME test_metrics COMMAND test_metrics)
+

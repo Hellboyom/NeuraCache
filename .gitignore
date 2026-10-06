@@ -1,6 +1,23 @@
+# Build artifacts
 build/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Python
+ml/.venv/
+__pycache__/
+*.pyc
+
+# Generated datasets
+ml/access_dataset.csv
+
+# IDE / OS
 .DS_Store
 .vscode/
 .idea/
+
+# Compiled files
 *.o
 *.out
