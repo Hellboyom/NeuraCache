@@ -348,5 +348,4 @@ NeuraCache brings together systems programming, data structures, caching algorit
 The central goal is to investigate how workload-aware eviction and access prediction can influence cache behavior, while keeping the core implementation measurable and testable.
 
 ## License
-
-No open-source license is specified in this repository at present. Unless you add a license file, reuse and redistribution are subject to the default copyright rules.
+Under MIT licence rules and regulations.
