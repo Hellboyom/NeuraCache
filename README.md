@@ -1,419 +1,352 @@
+
 # NeuraCache
 
-**NeuraCache** is a high-performance, adaptive in-memory database and caching system built in **C++17**.
+**An adaptive in-memory key-value database built with C++17, TCP networking, and workload-aware cache eviction.**
 
-It combines traditional LRU caching with access-pattern prediction to make smarter eviction decisions. The project also includes persistence, a RESP-inspired TCP protocol, runtime metrics, benchmarking, an experimental machine-learning predictor, and a real-time React monitoring dashboard.
-
----
+NeuraCache is a systems programming project that explores how cache eviction strategies, access-pattern prediction, persistence, and concurrency affect the performance of an in-memory database. It combines a lightweight C++ server with an experimental machine-learning pipeline and a React-based monitoring dashboard.
 
 ## Overview
 
-Traditional LRU caching assumes that recently accessed data is the data most likely to be accessed again.
+Traditional Least Recently Used (LRU) caching evicts the least recently accessed item when capacity is reached. This can perform poorly on scan-heavy workloads, where a sequence of one-time accesses can displace frequently reused keys.
 
-NeuraCache extends this idea by tracking both **frequency and recency of access** and using a lightweight predictor to estimate which keys are likely to remain useful.
+NeuraCache explores an alternative: combining access frequency and recency to estimate which keys are likely to remain useful. It also includes a separate machine-learning experiment to evaluate whether a learned access predictor can improve prediction accuracy on synthetic workloads.
 
-When the cache reaches capacity, NeuraCache uses these predictions to make eviction decisions instead of relying only on recency.
+The project is designed for exploring systems engineering concepts, not as a production-ready replacement for Redis.
 
-The project also includes an experimental ML pipeline that evaluates whether a learned model can improve access prediction over the built-in heuristic approach.
+## Architecture
 
----
+```mermaid
+flowchart TD
+    Client[TCP Client] --> Server[C++17 TCP Server]
+    Server --> Parser[RESP-Inspired Protocol Parser]
+    Parser --> Handler[Command Handler]
+    Handler --> DB[In-Memory Key-Value Store]
 
-## Key Features
+    DB --> Cache[Cache Eviction Layer]
+    Cache --> LRU[LRU Cache]
+    Cache --> Adaptive[Adaptive Eviction]
 
-### Core Database
+    Adaptive --> Predictor[Frequency and Recency Predictor]
+    DB --> TTL[TTL Management]
+    DB --> Persistence[Snapshot Persistence]
+    Server --> Metrics[Runtime Metrics]
+
+    Metrics --> Bridge[Node.js API Bridge]
+    Predictor --> Bridge
+    Bridge --> Dashboard[React Monitoring Dashboard]
+
+    ML[Python ML Experiment] -. Evaluation results .-> Predictor
+```
+
+The C++ server handles database operations and client connections. The monitoring dashboard communicates through a Node.js API bridge. The Python machine-learning experiment is separate from the core server, keeping the production prediction heuristic lightweight and independent of a Python runtime.
+
+## Features
+
+### Core database
 
 - In-memory key-value storage
-- `SET`
-- `GET`
-- `DEL`
-- `EXISTS`
-- `EXPIRE`
-- `TTL`
-- `INCR`
-- `DECR`
-- `DBSIZE`
-- `FLUSHDB`
-- `INFO`
+- Commands: `SET`, `GET`, `DEL`, `EXISTS`
+- Expiration: `EXPIRE`, `TTL`
+- Numeric operations: `INCR`, `DECR`
+- Database inspection: `DBSIZE`, `INFO`
+- Database clearing: `FLUSHDB`
 
-### Networking
+### Networking and concurrency
 
-- TCP server
-- Default port: `6379`
+- TCP server with a default port of `6379`
 - Persistent client connections
-- Multiple concurrent clients
+- Concurrent client handling
 - Request pipelining
 - Fragmented request handling
 - Partial response handling
 - Graceful shutdown
 
-### Adaptive Caching
+### Adaptive cache eviction
 
-NeuraCache supports prediction-aware adaptive caching built on top of an LRU cache.
+NeuraCache combines access frequency and recency to estimate the usefulness of tracked keys.
 
-The predictor tracks:
+The lightweight heuristic uses a weighted score:
 
-- Total accesses
-- Recent accesses
-- Access frequency
-- Access recency
+\[
+\text{Score} = 0.6 \times \text{Frequency}
++ 0.4 \times \text{Recency}
+\]
 
-The prediction score is calculated as:
+The implementation exposes prediction-related commands:
 
-score = 0.6 × frequency + 0.4 × recency
+- `PREDICT`
+- `TOPPREDICT`
+- `ANALYZE`
 
+This heuristic is implemented in C++ and does not require a machine-learning runtime.
 
-                     ┌─────────────────────┐
-                     │   React Dashboard   │
-                     │                     │
-                     │ Metrics / Charts    │
-                     │ AI Predictions      │
-                     └──────────┬──────────┘
-                                │ HTTP
-                                ▼
-                     ┌─────────────────────┐
-                     │ Node.js API Bridge  │
-                     │       :3001         │
-                     └──────────┬──────────┘
-                                │ RESP
-                                ▼
-┌──────────────────────────────────────────────────────┐
-│                 NeuraCache Server :6379              │
-│                                                      │
-│  ┌──────────────┐      ┌──────────────────────────┐ │
-│  │ RESP Parser  │─────▶│ Command Handler          │ │
-│  └──────────────┘      └────────────┬─────────────┘ │
-│                                     │               │
-│                                     ▼               │
-│                           ┌─────────────────────┐   │
-│                           │ Database            │   │
-│                           │                     │   │
-│                           │ Key / Value Storage │   │
-│                           └─────────┬───────────┘   │
-│                                     │               │
-│                           ┌─────────▼───────────┐   │
-│                           │ Adaptive Cache      │   │
-│                           └─────────┬───────────┘   │
-│                                     │               │
-│                    ┌────────────────┴────────────┐  │
-│                    ▼                             ▼  │
-│              ┌───────────┐                 ┌───────────┐
-│              │ LRU Cache │                 │ Predictor │
-│              └───────────┘                 └───────────┘
-│                                                      │
-│              ┌───────────┐      ┌─────────────────┐ │
-│              │  Metrics  │      │   Persistence   │ │
-│              └───────────┘      └─────────────────┘ │
-└──────────────────────────────────────────────────────┘
-'''
+### Persistence
 
+- Binary snapshot persistence
+- Database restoration during startup
+- Snapshot creation during shutdown
+- Backup snapshot handling
+- Preservation of remaining TTL information
 
+### Runtime metrics
 
-AI Prediction
-The production predictor is intentionally lightweight and does not require a machine-learning runtime.
-For each tracked key, NeuraCache maintains:
-- totalAccesses
-- recentAccesses
-The predictor combines normalized frequency and recency:
-prediction score = 0.6 × frequency + 0.4 × recency
-The system exposes prediction information through:
-- PREDICT
-- TOPPREDICT
-- ANALYZE
-Example:
-AI CACHE ANALYSIS
-total_accesses: 10
-tracked_keys: 1
-top_keys:
-  count score=1.000000 accesses=10
+The `INFO` command exposes operational statistics, including:
 
-Machine Learning Experiment
-The project includes a separate ML experiment to evaluate whether a learned model can improve future access prediction.
-The experiment uses:
-- Synthetic cache access data
-- Logistic Regression
-- A dummy baseline
-- The built-in heuristic predictor
-Results
-Predictor	Accuracy
-Baseline	66.75%
-Heuristic	67.85%
-Logistic Regression	74.00%
-
-
-The ML model achieved a 7.25 percentage-point improvement over the baseline and a 6.15 percentage-point improvement over the heuristic predictor on the synthetic evaluation dataset.
-These results are based on controlled synthetic data and should not be interpreted as production workload accuracy.
-
-The ML experiment is intentionally kept separate from the production C++ predictor so that the core system remains lightweight and dependency-free.
-Performance
-Representative benchmark results from the development machine:
-Workload	Throughput
-SET	~250K ops/sec
-GET	~1.8M ops/sec
-Mixed workload	~430K ops/sec
-
-
-Adaptive Cache Benchmark
-Under a hostile synthetic scan workload:
-Cache Policy	Hit Rate
-Traditional LRU	0%
-Adaptive Cache	33.3%
-
-
-The adaptive policy reduced misses from 1500 to 1000 in this benchmark.
-This demonstrates the potential advantage of prediction-aware eviction for workloads where traditional LRU performs poorly. It is not intended to claim universal superiority over LRU.
-Persistence
-NeuraCache supports binary snapshot persistence.
-Snapshots store:
-- Keys
-- Values
-- Remaining TTL information
-The snapshot lifecycle is:
-Server Startup
-      │
-      ▼
-Load Snapshot
-      │
-      ▼
-Restore Database
-
-and:
-Server Shutdown
-      │
-      ▼
-Write Snapshot
-
-Backup snapshot handling is also supported.
-Runtime Metrics
-NeuraCache tracks:
 - Total commands
-- GET commands
-- SET commands
-- DELETE commands
-- Cache hits
-- Cache misses
+- GET, SET, and DELETE operations
+- Cache hits and misses
 - Evictions
 - Expired keys
-- Uptime
-The INFO command exposes these statistics.
-The monitoring dashboard uses them to calculate real-time cache performance metrics such as hit rate.
-Monitoring Dashboard
-The project includes a React + Vite monitoring dashboard.
-The dashboard provides:
-- Server status
+- Server uptime
+
+### Monitoring dashboard
+
+The project includes a React and Vite dashboard, supported by a Node.js API bridge, for viewing:
+
+- Server status and uptime
 - Runtime statistics
 - Cache hit rate
-- GET / SET / DELETE activity
-- Cache evictions
-- Expired keys
+- GET, SET, and DELETE activity
+- Evictions and expired keys
 - Live command activity
-- AI predictions
-- Prediction scores
-- AI tracked keys
-- AI access statistics
-- Runtime uptime
-Dashboard Architecture
-React Dashboard
-       │
-       │ HTTP
-       ▼
-Node.js API Bridge
-       │
-       │ TCP / RESP
-       ▼
-NeuraCache
+- Prediction scores and tracked-key statistics
 
-This keeps the monitoring interface separate from the core C++ database implementation.
-Project Structure
+## Performance and Experiments
+
+The following figures are the project's reported development benchmarks and synthetic-workload results. They are not universal performance guarantees.
+
+### Throughput benchmarks
+
+| Workload | Reported throughput |
+|---|---:|
+| GET | ~1.8M operations/sec |
+| SET | ~250K operations/sec |
+| Mixed workload | ~430K operations/sec |
+
+Results depend on the hardware, compiler configuration, workload, concurrency, and benchmark methodology. Re-run the included benchmarks on your own machine before comparing these figures with other databases.
+
+### Adaptive cache benchmark
+
+Under the project's synthetic scan workload:
+
+| Cache policy | Reported hit rate |
+|---|---:|
+| Traditional LRU | 0% |
+| Adaptive cache | 33.3% |
+
+The adaptive policy reduced cache misses from 1,500 to 1,000 in this particular experiment. This illustrates a potential advantage on scan-heavy workloads; it does not establish that adaptive eviction outperforms LRU on all workloads.
+
+### Machine-learning experiment
+
+A separate Python experiment evaluates logistic regression against a dummy baseline and the built-in heuristic using synthetic cache-access data.
+
+| Predictor | Reported accuracy |
+|---|---:|
+| Dummy baseline | 66.75% |
+| Built-in heuristic | 67.85% |
+| Logistic regression | 74.00% |
+
+Logistic regression improved accuracy by 7.25 percentage points over the baseline and 6.15 percentage points over the heuristic in this evaluation.
+
+**Important:** These are results from controlled synthetic data. They should not be interpreted as accuracy on production traffic or evidence of improved end-to-end database throughput. The ML experiment is separate from the C++ server's built-in predictor.
+
+## Technology Stack
+
+| Component | Technologies |
+|---|---|
+| Core server | C++17 |
+| Networking | TCP sockets, RESP-inspired protocol |
+| Build system | CMake |
+| Cache algorithms | LRU, adaptive frequency/recency scoring |
+| Persistence | Binary snapshots |
+| ML experiment | Python, NumPy, scikit-learn |
+| API bridge | Node.js |
+| Dashboard | React, Vite |
+| Testing | CTest and C++ test executables |
+
+## Project Structure
+
+```text
 NeuraCache/
-│
 ├── benchmarks/
 │   ├── benchmark.cpp
 │   ├── concurrent_benchmark.cpp
 │   └── adaptive_benchmark.cpp
-│
 ├── docs/
 │   └── architecture.md
-│
 ├── frontend/
 │   ├── server/
 │   │   └── index.cjs
 │   └── src/
-│       ├── App.jsx
-│       ├── App.css
-│       └── index.css
-│
 ├── ml/
 │   ├── generate_dataset.py
 │   ├── train_predictor.py
 │   └── evaluate_predictors.py
-│
 ├── src/
 │   ├── ai/
-│   │   ├── predictor.cpp
-│   │   └── predictor.h
-│   │
 │   ├── commands/
-│   │   ├── command_handler.cpp
-│   │   └── command_handler.h
-│   │
 │   ├── eviction/
-│   │   ├── lru_cache.cpp
-│   │   ├── lru_cache.h
-│   │   ├── adaptive_cache.cpp
-│   │   └── adaptive_cache.h
-│   │
 │   ├── metrics/
-│   │   ├── metrics.cpp
-│   │   └── metrics.h
-│   │
 │   ├── persistence/
-│   │   ├── snapshot.cpp
-│   │   └── snapshot.h
-│   │
 │   ├── protocol/
-│   │   ├── resp.cpp
-│   │   └── resp.h
-│   │
 │   ├── server/
-│   │   ├── server.cpp
-│   │   └── server.h
-│   │
 │   └── storage/
-│       ├── database.cpp
-│       └── database.h
-│
 ├── tests/
-│   ├── test_commands.cpp
-│   ├── test_database.cpp
-│   ├── test_resp.cpp
-│   ├── test_server.cpp
-│   ├── test_lru.cpp
-│   ├── test_concurrency.cpp
-│   ├── test_snapshot.cpp
-│   ├── test_metrics.cpp
-│   ├── test_adaptive_cache.cpp
-│   └── test_adaptive_integration.cpp
-│
 ├── CMakeLists.txt
 └── README.md
+```
 
-Getting Started
-Requirements
-- C++17 compatible compiler
+## Getting Started
+
+### Prerequisites
+
+- C++17-compatible compiler
 - CMake
 - macOS or Linux
-- Node.js and npm
-- Python 3 for the ML experiment
-Build NeuraCache
+- Node.js and npm for the dashboard
+- Python 3 and pip for the optional ML experiment
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/Hellboyom/NeuraCache.git
+cd NeuraCache
+```
+
+### 2. Build the C++ server
+
+```bash
 cmake -S . -B build
 cmake --build build -j
+```
 
-Run the Server
+### 3. Run the server
+
+```bash
 ./build/neuracache
+```
 
-The server starts on:
-127.0.0.1:6379
+The server listens on `127.0.0.1:6379` by default.
 
-You can connect using:
+In a second terminal, you can open a TCP connection using:
+
+```bash
 nc 127.0.0.1 6379
+```
 
-Run the Dashboard
-In another terminal:
+The server uses a RESP-inspired protocol. Use a compatible client or send commands in the protocol format expected by the implementation.
+
+### 4. Run the tests
+
+```bash
+ctest --test-dir build --output-on-failure
+```
+
+The test suite covers database operations, command handling, protocol parsing, LRU behavior, adaptive caching, concurrency, persistence, and runtime metrics.
+
+### 5. Start the monitoring dashboard
+
+In a separate terminal:
+
+```bash
 cd frontend
 npm install
+```
+
+Start the Node.js API bridge:
+
+```bash
 node server/index.cjs
+```
 
-Then start the React development server:
+Start the React development server in another terminal:
+
+```bash
+cd NeuraCache/frontend
 npm run dev
+```
 
-Open:
-http://localhost:5173
-The API bridge runs on:
-http://localhost:3001
-Testing
-Build the project:
-cmake -S . -B build
-cmake --build build
+Open the local development URL printed by Vite, typically `http://localhost:5173`. The API bridge uses port `3001` in the current project configuration.
 
-Run the test suite:
-cd build
-ctest --output-on-failure
+### 6. Run the optional ML experiment
 
-The tests cover:
-- Database operations
-- Command handling
-- RESP parsing
-- LRU behavior
-- Adaptive cache behavior
-- Adaptive cache integration
-- Concurrency
-- Persistence
-- Runtime metrics
-ML Experiment Setup
-Create a Python environment:
+From the repository root:
+
+```bash
 python3 -m venv ml/.venv
 source ml/.venv/bin/activate
-
-Install dependencies:
 python -m pip install numpy scikit-learn
-
-Generate the dataset:
 python ml/generate_dataset.py
-
-Train the predictor:
 python ml/train_predictor.py
-
-Evaluate the predictors:
 python ml/evaluate_predictors.py
+```
 
-Design Decisions
-Why C++?
-C++ provides:
-- Low-level memory control
-- High performance
-- Efficient data structures
-- Direct socket programming
-- Strong concurrency primitives
-Why Adaptive Eviction?
-LRU works well when recent accesses are strong indicators of future accesses.
-However, scan-heavy workloads can cause frequently reused keys to be repeatedly evicted.
-NeuraCache supplements recency with access-pattern prediction to make eviction decisions based on estimated future usefulness.
-Why Keep ML Separate?
-The ML experiment demonstrates the feasibility of learned prediction without introducing Python or model-runtime dependencies into the production cache.
-This keeps the core system:
-- Lightweight
-- Fast
-- Deterministic
-- Easy to build
-while providing a foundation for future learned caching strategies.
-Current Limitations
-NeuraCache is not intended to be a complete Redis replacement.
-Current limitations include:
+Run the experiment independently of the C++ server. If your scripts or dependency versions change, update these instructions to match the tested workflow.
+
+## Testing and Benchmarking
+
+NeuraCache includes test and benchmark code under `tests/` and `benchmarks/`.
+
+For meaningful performance comparisons, record:
+
+- CPU and memory configuration
+- Operating system and compiler version
+- Build type and compiler flags
+- Dataset size and access distribution
+- Number of clients and concurrency level
+- Warm-up period and measurement duration
+- Whether persistence, logging, or dashboard processes were active
+
+Use repeatable workloads and multiple runs when comparing eviction policies or throughput. Keep synthetic cache hit-rate experiments separate from server throughput benchmarks.
+
+## Engineering Decisions
+
+### Why C++17?
+
+C++ provides direct control over data structures, memory usage, socket programming, and concurrency. It is a useful foundation for experimenting with performance-sensitive infrastructure.
+
+### Why adaptive eviction?
+
+Pure recency-based eviction can struggle when scans displace frequently reused data. Combining frequency and recency provides an alternative policy to evaluate against LRU under different access distributions.
+
+### Why separate the ML experiment?
+
+The Python experiment allows learned predictors to be evaluated without adding Python or a model-runtime dependency to the core C++ server. This preserves a lightweight built-in heuristic while allowing experimentation with alternative prediction methods.
+
+## Current Limitations
+
+NeuraCache is an experimental, single-node systems project. Current limitations include:
+
 - Single-node architecture
 - Thread-per-client networking model
 - In-memory primary storage
-- Experimental ML predictor
+- Snapshot-based rather than append-only-log persistence
 - No distributed clustering
 - No authentication
-- No AOF persistence
 - Limited Redis command compatibility
-These are deliberate scope boundaries for the current version.
-Future Work
-Potential future improvements include:
-- More advanced learned cache policies
-- Training on real-world access traces
-- Sharded storage
-- Connection pooling
-- More scalable concurrency architecture
-- Additional Redis-compatible commands
-- AOF-style durability
-- Distributed caching
-- More sophisticated workload-aware benchmarking
-Engineering Focus
-NeuraCache was built to explore practical systems concepts including:
-Systems Programming + Data Structures + Caching Algorithms + Concurrency + Networking + Persistence + Performance Engineering + Machine Learning + Observability
-The goal is not simply to implement a key-value store, but to explore how adaptive algorithms and workload prediction can influence systems-level decisions.
-License
-This project is intended as a software engineering and systems project for educational and portfolio purposes.
+- Experimental prediction methods evaluated on synthetic data
 
+These boundaries are intentional for the current scope. The project should not be treated as a production-ready Redis replacement.
 
+## Future Work
+
+Potential improvements include:
+
+- Benchmarking against additional eviction policies and established databases
+- Evaluation using real-world cache-access traces
+- More scalable networking and concurrency
+- Additional protocol and command compatibility
+- Append-only-log persistence and recovery testing
+- Connection pooling and resource limits
+- Distributed or sharded caching
+- Reproducible benchmark reports and continuous integration
+
+## Learning Outcomes
+
+NeuraCache brings together systems programming, data structures, caching algorithms, networking, concurrency, persistence, performance measurement, and machine-learning experimentation.
+
+The central goal is to investigate how workload-aware eviction and access prediction can influence cache behavior, while keeping the core implementation measurable and testable.
+
+## License
+
+No open-source license is specified in this repository at present. Unless you add a license file, reuse and redistribution are subject to the default copyright rules.
